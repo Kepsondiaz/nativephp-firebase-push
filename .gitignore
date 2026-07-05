@@ -1,0 +1,18 @@
+# Dependencies
+/vendor/
+composer.lock
+
+# Firebase credentials — never commit these
+google-services.json
+GoogleService-Info.plist
+
+# Tooling caches
+/.phpunit.cache/
+.phpunit.result.cache
+.phpstan.cache/
+/build/
+
+# Editor / OS
+/.idea/
+/.vscode/
+.DS_Store

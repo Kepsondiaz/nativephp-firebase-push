@@ -16,15 +16,20 @@ Never lose sight of that goal. Every design decision should make that path short
 
 ## Language Constraints
 
-This is a documentation and PHP-only project. The following languages are **forbidden** in this repository:
+Implementation has begun. This repository now contains real implementation code across three language layers:
 
-- PHP source code (no implementation — docs and contracts only until implementation begins)
-- Kotlin
-- Swift
+- **PHP** — the package layer (manager, contracts, data objects, events, repositories, commands, facade, service provider).
+- **Kotlin** — the Android layer (NativePHP plugin, `FirebaseMessagingService`, permission and channel handling).
+- **Swift** — the iOS layer (NativePHP plugin, app delegate hooks, messaging and notification-center delegates).
+
+Each language stays within its architectural layer as defined in `docs/ARCHITECTURE.md`. PHP never contains platform code; Kotlin and Swift never contain Laravel business logic. All cross-layer communication goes through the NativePHP bridge.
+
+The following languages remain **forbidden** in this repository:
+
 - JavaScript
 - TypeScript
 
-If a task requires writing platform implementation code, describe it in documentation instead.
+The package requires no web or Node tooling beyond what NativePHP itself manages. If a task appears to need JS/TS, raise it before writing any.
 
 ---
 
