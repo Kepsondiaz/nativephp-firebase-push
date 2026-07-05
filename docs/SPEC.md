@@ -161,6 +161,7 @@ Kepson\NativePhpFirebasePush\Data\PushNotification
 | `title` | `?string` | Notification title |
 | `body` | `?string` | Notification body text |
 | `imageUrl` | `?string` | Optional image URL attached to the notification |
+| `link` | `?string` | Deep-link target to navigate to when the notification is tapped (from the `link` or `url` payload key) |
 | `data` | `array<string, string>` | Arbitrary key/value data payload from FCM |
 | `sentAt` | `?CarbonImmutable` | UTC timestamp set by the FCM server at send time |
 | `receivedAt` | `CarbonImmutable` | UTC timestamp recorded by the device on receipt |

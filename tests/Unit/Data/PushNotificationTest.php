@@ -11,6 +11,7 @@ it('builds a full notification from a bridge payload', function () {
         'title' => 'Hello',
         'body' => 'World',
         'imageUrl' => 'https://example.test/pic.png',
+        'link' => '/orders/42',
         'data' => ['orderId' => '42', 'kind' => 'shipment'],
         'sentAt' => '2026-07-04T10:00:00+00:00',
         'receivedAt' => '2026-07-04T10:00:05+00:00',
@@ -24,6 +25,7 @@ it('builds a full notification from a bridge payload', function () {
         ->and($notification->title)->toBe('Hello')
         ->and($notification->body)->toBe('World')
         ->and($notification->imageUrl)->toBe('https://example.test/pic.png')
+        ->and($notification->link)->toBe('/orders/42')
         ->and($notification->data)->toBe(['orderId' => '42', 'kind' => 'shipment'])
         ->and($notification->sentAt)->toBeInstanceOf(CarbonImmutable::class)
         ->and($notification->sentAt?->toIso8601String())->toBe('2026-07-04T10:00:00+00:00')
@@ -41,6 +43,7 @@ it('defaults optional fields when absent from the payload', function () {
         ->and($notification->title)->toBeNull()
         ->and($notification->body)->toBeNull()
         ->and($notification->imageUrl)->toBeNull()
+        ->and($notification->link)->toBeNull()
         ->and($notification->data)->toBe([])
         ->and($notification->sentAt)->toBeNull()
         ->and($notification->channel)->toBeNull()
@@ -73,6 +76,7 @@ it('round-trips through toArray with iso 8601 timestamps', function () {
         'title' => 'Hello',
         'body' => null,
         'imageUrl' => null,
+        'link' => '/deep/link',
         'data' => ['k' => 'v'],
         'sentAt' => '2026-07-04T10:00:00+00:00',
         'receivedAt' => '2026-07-04T10:00:05+00:00',
@@ -87,6 +91,7 @@ it('round-trips through toArray with iso 8601 timestamps', function () {
         'title' => 'Hello',
         'body' => null,
         'imageUrl' => null,
+        'link' => '/deep/link',
         'data' => ['k' => 'v'],
         'sentAt' => '2026-07-04T10:00:00+00:00',
         'receivedAt' => '2026-07-04T10:00:05+00:00',
@@ -95,4 +100,23 @@ it('round-trips through toArray with iso 8601 timestamps', function () {
         'tapped' => false,
         'foreground' => true,
     ]);
+});
+
+it('falls back to the url key when link is absent', function () {
+    $notification = PushNotification::fromBridgePayload([
+        'id' => 'x',
+        'url' => '/from-url',
+    ]);
+
+    expect($notification->link)->toBe('/from-url');
+});
+
+it('prefers the link key over url when both are present', function () {
+    $notification = PushNotification::fromBridgePayload([
+        'id' => 'x',
+        'link' => '/from-link',
+        'url' => '/from-url',
+    ]);
+
+    expect($notification->link)->toBe('/from-link');
 });
