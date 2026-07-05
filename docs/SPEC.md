@@ -123,7 +123,9 @@ Registers a handler invoked when the user denies notification permission. The ca
 
 #### Capability Availability
 
-The package adapts over the native push surface exposed by NativePHP Mobile (`Native\Mobile\PushNotifications` and the `TokenGenerated` event). Where a method's underlying native capability is not yet exposed by NativePHP Mobile, calling it throws `Kepson\NativePhpFirebasePush\Exceptions\FeatureNotSupported` rather than silently doing nothing. As of the current milestone this applies to `revokeToken()`, `onTokenRevoked()`, `onNotificationReceived()`, `onNotificationTapped()`, `onPermissionGranted()`, and `onPermissionDenied()`. `docs/ROADMAP.md` tracks when each becomes available.
+The package adapts over the native push surface: the free `nativephp/mobile` base for token + permission, and this package's own native plugin for notification receiving, taps and permission results. Where a method's underlying native capability does not exist yet, calling it throws `Kepson\NativePhpFirebasePush\Exceptions\FeatureNotSupported` rather than silently doing nothing. As of the current milestone this applies only to `revokeToken()` and `onTokenRevoked()` (NativePHP Mobile exposes no token-deletion API). `docs/ROADMAP.md` tracks when each becomes available.
+
+Note that `onNotificationReceived()`, `onNotificationTapped()`, `onPermissionGranted()`, and `onPermissionDenied()` are wired in the PHP layer and dispatch correctly, but only fire on a device once the accompanying Android native plugin is installed.
 
 ### Configuration
 
@@ -139,9 +141,9 @@ php artisan firebase-push:token
 Outputs the current device FCM token to stdout. Useful during development and debugging.
 
 ```
-php artisan firebase-push:test {token}
+php artisan firebase-push:test {token} {--title=} {--body=} {--url=}
 ```
-Sends a test notification payload through the NativePHP bridge to the local device. Does not make any server-side FCM API call.
+Locally simulates an inbound notification by dispatching the internal native received-event, so you can exercise your `onNotificationReceived` handlers and listeners without sending a real FCM message. Makes no server-side FCM API call and requires no network. The `{token}` argument is carried in the simulated payload's `data` for reference.
 
 ---
 
@@ -161,6 +163,7 @@ Kepson\NativePhpFirebasePush\Data\PushNotification
 | `title` | `?string` | Notification title |
 | `body` | `?string` | Notification body text |
 | `imageUrl` | `?string` | Optional image URL attached to the notification |
+| `link` | `?string` | Deep-link target to navigate to when the notification is tapped (from the `link` or `url` payload key) |
 | `data` | `array<string, string>` | Arbitrary key/value data payload from FCM |
 | `sentAt` | `?CarbonImmutable` | UTC timestamp set by the FCM server at send time |
 | `receivedAt` | `CarbonImmutable` | UTC timestamp recorded by the device on receipt |

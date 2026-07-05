@@ -9,7 +9,7 @@
         "laravel",
         "mobile"
     ],
-    "type": "library",
+    "type": "nativephp-plugin",
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -46,6 +46,9 @@
             "aliases": {
                 "FirebasePush": "Kepson\\NativePhpFirebasePush\\Facades\\FirebasePush"
             }
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
         }
     },
     "config": {

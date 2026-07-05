@@ -133,6 +133,53 @@ Capabilities NativePHP Mobile does **not** currently expose to PHP — and which
 
 ---
 
+## Native Plugin Structure (v0.2+)
+
+To deliver the capabilities the free base lacks — foreground notification receiving, tap + deep linking, notification channels — this package must ship its own native code. NativePHP Mobile supports this through its **plugin system** (MIT), the same mechanism the commercial `nativephp/mobile-firebase` plugin uses. Findings from the v0.2 spike:
+
+**A NativePHP plugin is a Composer package** with `"type": "nativephp-plugin"` and a `nativephp.json` manifest. This means the package's `composer.json` `type` changes from `library` to `nativephp-plugin`, and a manifest plus native source directories are added:
+
+```
+resources/
+├── android/src/     — Kotlin source (package-declared; compiler places by package)
+├── ios/Sources/     — Swift source
+└── js/              — optional JS bridge
+nativephp.json       — plugin manifest
+```
+
+**`nativephp.json` manifest** declares the native surface:
+
+- `namespace` — plugin namespace for code generation.
+- `bridge_functions` — PHP→native call mappings (`name`, `android`, `ios` fully-qualified handlers).
+- `events` — event classes the native side dispatches back to PHP (e.g. our `Events\NotificationReceived`, `Events\NotificationTapped`).
+- `android.services` — native services registered in the Android manifest, e.g. a `FirebaseMessagingService` bound to the `com.google.firebase.MESSAGING_EVENT` intent action.
+- `android.permissions` — e.g. `android.permission.POST_NOTIFICATIONS`.
+- `android.dependencies` — Gradle deps, e.g. `com.google.firebase:firebase-messaging`.
+- `android.min_version` — API 26 per the SPEC.
+
+**Native → PHP events.** A Kotlin service maps the FCM `RemoteMessage` to our payload shape and dispatches one of the manifest-declared event classes into the persistent PHP runtime. PHP subscribes via Livewire's `#[OnNative(...)]` attribute (events are delivered on the `native:` channel) or, for our centralised design, via the service provider forwarding to `FirebasePushManager`. Bridge functions implement `com.nativephp.mobile.bridge.BridgeFunction` and return `BridgeResponse.success(map)`.
+
+**Authoring & build commands** (run inside a host NativePHP app, not this package repo):
+
+- `php artisan native:plugin:create` — interactive scaffold.
+- `php artisan native:plugin:register <vendor/name>` — register into the host app's `plugins()` array.
+- `php artisan native:plugin:validate` — validate the manifest.
+- `php artisan native:run` — rebuild native code onto a device/emulator.
+
+**Confirmed mechanism (from the `nativephp/mobile-camera` reference).** Native code dispatches an event to PHP by calling `NativeActionCoordinator.dispatchEvent("Fully\\Qualified\\PhpEvent", jsonPayloadString)` (from `com.nativephp.mobile.utils`). The runtime maps top-level JSON keys onto the PHP event class's constructor parameters — and array/object parameters are supported (the base `Gallery\MediaSelected` has `public array $files`), so our bridge events take a single `array $payload` populated from a `{ "payload": { … } }` envelope.
+
+**Components in this package** (`resources/android/`):
+
+- `FirebasePushMessagingService.kt` — a `FirebaseMessagingService`; `onMessageReceived` maps the FCM `RemoteMessage` to our payload, displays a notification (creating the channel), and dispatches `NativeNotificationReceived`.
+- `FirebasePushTapActivity.kt` — a trampoline launched by the notification's tap intent; dispatches `NativeNotificationTapped` (with any deep-link target) and resumes the host app.
+- `nativephp.json` — declares the service (bound to `com.google.firebase.MESSAGING_EVENT`), the `POST_NOTIFICATIONS` permission, the `firebase-messaging` Gradle dependency, and the three bridge event classes.
+
+> **Status: unverified drafts.** The Kotlin above is written to the reference pattern but has **not** been built or run. Known open questions: (1) whether registering our service shadows the base's token-generating service (FCM delivers to one service); (2) the exact `dispatchEvent` accessor; (3) registering the tap activity in the manifest; (4) capturing taps on system-displayed background notifications; (5) injecting the PHP channel config into native. These require a host NativePHP app + Android toolchain + emulator to resolve.
+
+**Testing boundary.** The PHP layer (payload mapping, manager wiring, event dispatch) is fully testable in this repo with the `FakeBridgeDispatcher`. The Kotlin layer requires a host NativePHP app, the Android toolchain, and an emulator/device, and is therefore verified manually per release — not in CI (see `docs/CONTRIBUTING.md`).
+
+---
+
 ## Communication Flow
 
 ### Token Registration (Happy Path)

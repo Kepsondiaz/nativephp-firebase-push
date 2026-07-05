@@ -8,7 +8,11 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
+use Kepson\NativePhpFirebasePush\Bridge\Events\NativeNotificationReceived;
+use Kepson\NativePhpFirebasePush\Bridge\Events\NativeNotificationTapped;
+use Kepson\NativePhpFirebasePush\Bridge\Events\NativePermissionResult;
 use Kepson\NativePhpFirebasePush\Bridge\NativePushBridge;
+use Kepson\NativePhpFirebasePush\Commands\TestNotificationCommand;
 use Kepson\NativePhpFirebasePush\Commands\TokenCommand;
 use Kepson\NativePhpFirebasePush\Contracts\BridgeDispatcher;
 use Kepson\NativePhpFirebasePush\Contracts\FirebasePushManager as FirebasePushManagerContract;
@@ -48,13 +52,37 @@ final class FirebasePushServiceProvider extends ServiceProvider
 
             $this->commands([
                 TokenCommand::class,
+                TestNotificationCommand::class,
             ]);
         }
 
-        $this->app->make(Dispatcher::class)->listen(
+        $events = $this->app->make(Dispatcher::class);
+
+        $events->listen(
             TokenGenerated::class,
             function (TokenGenerated $event): void {
                 $this->app->make(FirebasePushManager::class)->handleNativeToken($event->token);
+            },
+        );
+
+        $events->listen(
+            NativeNotificationReceived::class,
+            function (NativeNotificationReceived $event): void {
+                $this->app->make(FirebasePushManager::class)->handleNativeNotificationReceived($event->payload);
+            },
+        );
+
+        $events->listen(
+            NativeNotificationTapped::class,
+            function (NativeNotificationTapped $event): void {
+                $this->app->make(FirebasePushManager::class)->handleNativeNotificationTapped($event->payload);
+            },
+        );
+
+        $events->listen(
+            NativePermissionResult::class,
+            function (NativePermissionResult $event): void {
+                $this->app->make(FirebasePushManager::class)->handleNativePermissionResult($event->status);
             },
         );
     }

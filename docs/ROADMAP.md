@@ -49,26 +49,27 @@ Milestone scope may be adjusted based on community feedback and upstream NativeP
 
 ---
 
-## v0.2 — Android Complete
+## v0.2 — Android notification receiving
 
-**Goal:** Full FCM feature set on Android. iOS scaffolding begins.
+**Goal:** Deliver the paid plugin's core Android features — foreground notifications, tap + deep linking, permission results — over the free base.
 
-**Deliverables:**
+**PHP layer (done, tested with the fake bridge):**
 
-- Android: Foreground notification delivery — `onMessageReceived` → `firebase-push.notification-received`.
-- Android: Background/killed-state notification tap handling — `firebase-push.notification-tapped`.
-- Android: `NotificationChannelManager` creating the default channel from PHP config.
-- Android: `PermissionHandler` for `POST_NOTIFICATIONS` runtime permission (Android 13+).
-- Android: `BridgeCallHandler` handling all three outbound calls (`request-permission`, `get-token`, `revoke-token`).
-- `NotificationReceived`, `NotificationTapped`, `PermissionGranted`, `PermissionDenied`, `TokenRevoked` events dispatched from `FirebasePushManager`.
-- `FirebasePush::requestPermission()`, `isPermissionGranted()`, `revokeToken()` fully wired.
-- `php artisan firebase-push:test {token}` command working locally.
-- Feature tests covering the full Android bridge communication flow (mocked bridge).
-- PHPStan raised to level 7.
-- `google-services.json` path resolution and build-time copy documented and tested against a real emulator.
-- `CHANGELOG.md` introduced.
+- ✅ `NotificationReceived` / `NotificationTapped` dispatched from `FirebasePushManager`; `onNotificationReceived` / `onNotificationTapped` un-stubbed.
+- ✅ `PermissionGranted` / `PermissionDenied` dispatched; `onPermissionGranted` / `onPermissionDenied` un-stubbed.
+- ✅ `PushNotification.link` deep-link field.
+- ✅ Internal bridge events forwarded by the service provider to the manager.
+- ✅ `php artisan firebase-push:test` (local simulation).
+- ✅ PHPStan raised to level 7; `CHANGELOG.md` introduced.
 
-**Not included:** iOS implementation (structure only).
+**Android native layer (drafted, pending device verification):**
+
+- ⚠️ Converted to a `nativephp-plugin` with `nativephp.json`.
+- ⚠️ `FirebasePushMessagingService.kt` — foreground `onMessageReceived`, channel creation, notification display.
+- ⚠️ `FirebasePushTapActivity.kt` — tap → deep link.
+- ◻️ Verify on a real emulator/device: service interaction with the base's token service, tap capture for system-displayed notifications, injecting channel config into native, `google-services.json` build-time placement.
+
+**Not included:** iOS implementation, revocation (no native API), server-side sending.
 
 ---
 

@@ -117,12 +117,6 @@ it('throws when revokeToken is called because no native revoke API exists', func
     $this->manager->revokeToken();
 })->throws(FeatureNotSupported::class);
 
-it('throws when registering a callback for a feature not delivered in this milestone', function (string $method) {
-    $this->manager->{$method}(fn () => null);
-})->throws(FeatureNotSupported::class)->with([
-    'onTokenRevoked',
-    'onNotificationReceived',
-    'onNotificationTapped',
-    'onPermissionGranted',
-    'onPermissionDenied',
-]);
+it('throws when registering an onTokenRevoked callback because revocation is unsupported', function () {
+    $this->manager->onTokenRevoked(fn () => null);
+})->throws(FeatureNotSupported::class);
