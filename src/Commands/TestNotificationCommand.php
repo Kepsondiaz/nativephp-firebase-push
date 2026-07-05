@@ -26,12 +26,14 @@ final class TestNotificationCommand extends Command
 
     public function handle(Dispatcher $events): int
     {
+        $token = $this->argument('token');
+
         $payload = array_filter([
             'id' => (string) Str::uuid(),
             'title' => $this->option('title'),
             'body' => $this->option('body'),
             'link' => $this->option('url'),
-            'data' => ['token' => (string) $this->argument('token')],
+            'data' => ['token' => is_string($token) ? $token : ''],
         ], static fn (mixed $value): bool => $value !== null);
 
         $events->dispatch(new NativeNotificationReceived($payload));
