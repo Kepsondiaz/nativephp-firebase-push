@@ -2,17 +2,26 @@
 
 This roadmap tracks the planned development trajectory from initial proof-of-concept through a stable production release. Each milestone is independently releasable and delivers concrete, testable value.
 
+**Mission:** deliver a free (MIT) equivalent of the paid `nativephp/mobile-firebase` plugin, built on the free `nativephp/mobile` base. Each milestone below is measured against feature parity with that commercial plugin.
+
+**Native vs. PHP work.** The free base covers token + permission only, so:
+
+- **Token registration (v0.1)** — pure PHP, wraps the free base. No native code.
+- **Notification receiving, tap/deep-link, data messages (v0.2+)** — these are exactly what the commercial plugin sells and are *not* in the free base, so they require our **own native Kotlin/Swift** registered through NativePHP's (MIT) plugin system.
+- **Server-side FCM sending** — pure PHP against the FCM HTTP v1 API. No native code, no device needed to test; a strong candidate to bring forward.
+
 Milestone scope may be adjusted based on community feedback and upstream NativePHP changes. Nothing past the current milestone is a firm commitment.
 
 ---
 
-> **Architecture note (adopted during v0.1):** NativePHP Mobile v3 already owns the
-> native Android FCM / iOS APNs integration and exposes it via
-> `Native\Mobile\PushNotifications` (`getToken`, `checkPermission`, `enroll`) plus the
-> `TokenGenerated` Laravel event. This package therefore **adapts** over that surface
-> instead of shipping its own Kotlin/Swift or a custom `firebase-push.*` bridge. Native
-> bullets in the milestones below apply only to capabilities NativePHP Mobile does not
-> yet expose to PHP. See `docs/ARCHITECTURE.md`.
+> **Architecture note (adopted during v0.1):** The free `nativephp/mobile` base exposes
+> token + permission via `Native\Mobile\PushNotifications` (`getToken`, `checkPermission`,
+> `enroll`) plus the `TokenGenerated` Laravel event. For **token registration (v0.1)** this
+> package simply **adapts** over that surface — no custom Kotlin/Swift, no custom
+> `firebase-push.*` bridge. For the capabilities the free base does *not* provide (message
+> receiving, taps/deep links, data messages — the features the commercial plugin charges
+> for), later milestones add **our own native code** through NativePHP's plugin system.
+> See `docs/ARCHITECTURE.md`.
 
 ## v0.1 — Foundation
 
