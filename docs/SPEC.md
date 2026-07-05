@@ -2,14 +2,27 @@
 
 ## Project Vision
 
-NativePHP Firebase Push is the canonical Firebase Cloud Messaging (FCM) integration for NativePHP Mobile applications. It provides a first-class, Laravel-native developer experience for sending, receiving, and responding to push notifications on Android and iOS — without writing a single line of platform-specific code.
+NativePHP Firebase Push is a **free, open-source (MIT) alternative to the paid `nativephp/mobile-firebase` plugin**. It provides a first-class, Laravel-native developer experience for sending, receiving, and responding to Firebase Cloud Messaging (FCM) push notifications on Android and iOS — without writing a single line of platform-specific code as a consumer.
 
-The package is designed to become the community standard: production-ready from day one, opinionated where it improves reliability, and flexible where teams genuinely need customization.
+It builds on top of the free `nativephp/mobile` base package (MIT), which ships the token and permission primitives, and adds the higher-level capabilities that are otherwise only available in the commercial plugin.
+
+The package is designed to become a community standard: production-ready, opinionated where it improves reliability, and flexible where teams genuinely need customization.
+
+### Relationship to NativePHP Mobile
+
+| Layer | Package | License | Provides |
+|---|---|---|---|
+| Base runtime | `nativephp/mobile` | MIT (free) | FCM/APNs **token + permission** primitives (`PushNotifications::getToken/checkPermission/enroll/clearBadge`) and the `TokenGenerated` event |
+| Commercial plugin | `nativephp/mobile-firebase` | Proprietary ($99 / NativePHP Ultra) | Notification receiving, tap + **deep linking**, data-only background messages, badge handling, **server-side FCM sending** |
+| **This package** | `kepson/nativephp-firebase-push` | **MIT (free)** | A free equivalent of the commercial plugin's feature set, layered over the free base |
+
+This package **requires** `nativephp/mobile` (it wraps the free base) and is a drop-in-spirit free alternative to `nativephp/mobile-firebase` — it does not remove the need for NativePHP Mobile itself.
 
 ---
 
 ## Goals
 
+- Provide a free (MIT) equivalent to the commercial `nativephp/mobile-firebase` plugin so teams are not forced into a paid plugin for standard FCM push.
 - Enable Laravel developers to integrate FCM push notifications into NativePHP Mobile apps using familiar Laravel patterns.
 - Abstract all Android (Kotlin) and iOS (Swift) FCM SDK details behind a PHP/NativePHP bridge — no platform code required from consumers.
 - Support the full FCM notification lifecycle: token registration, foreground and background delivery, user interaction (tap), token refresh, and revocation.
@@ -24,7 +37,7 @@ The package is designed to become the community standard: production-ready from 
 - Web push notifications (FCM Web SDK is out of scope).
 - Direct APNs integration without FCM (Apple Push Notification service bypassing Firebase is not supported).
 - In-app messaging, Firebase Analytics, Firebase Crashlytics, or any other Firebase product beyond FCM.
-- Server-side FCM message dispatch (the package handles the mobile client side; sending notifications from the server is left to the application or a companion package).
+- Server-side FCM message dispatch is **not** part of the initial mobile-client milestones, but — because the commercial plugin includes it — it is a planned parity feature (see the Roadmap), delivered as pure PHP against the FCM HTTP v1 API. It requires no native code.
 - Support for NativePHP Desktop (Electron) — mobile only.
 - Support for NativePHP versions below v3.
 

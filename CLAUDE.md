@@ -6,11 +6,11 @@ This file is read by Claude Code at the start of every session. Follow everythin
 
 ## Project Identity
 
-This package is the Firebase Cloud Messaging integration layer for NativePHP Mobile. It bridges the FCM Android and iOS SDKs to the PHP/Laravel layer through the NativePHP bridge.
+This package is a **free, MIT-licensed alternative to the paid `nativephp/mobile-firebase` plugin**. It is the Firebase Cloud Messaging integration layer for NativePHP Mobile, built on top of the free `nativephp/mobile` base (which provides only token + permission primitives). It bridges the FCM Android and iOS SDKs to the PHP/Laravel layer.
 
-The single most important goal is that a Laravel developer can add production-quality push notifications to a NativePHP Mobile app without writing any platform-specific code.
+The single most important goal is that a Laravel developer can add production-quality push notifications to a NativePHP Mobile app without writing any platform-specific code, and without paying for the commercial plugin.
 
-Never lose sight of that goal. Every design decision should make that path shorter and more reliable for the developer.
+Never lose sight of that goal. Every design decision should make that path shorter and more reliable for the developer. Parity target: the feature set of `nativephp/mobile-firebase` (receiving, taps/deep links, data messages, server-side sending).
 
 ---
 
