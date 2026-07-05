@@ -6,9 +6,17 @@ Milestone scope may be adjusted based on community feedback and upstream NativeP
 
 ---
 
+> **Architecture note (adopted during v0.1):** NativePHP Mobile v3 already owns the
+> native Android FCM / iOS APNs integration and exposes it via
+> `Native\Mobile\PushNotifications` (`getToken`, `checkPermission`, `enroll`) plus the
+> `TokenGenerated` Laravel event. This package therefore **adapts** over that surface
+> instead of shipping its own Kotlin/Swift or a custom `firebase-push.*` bridge. Native
+> bullets in the milestones below apply only to capabilities NativePHP Mobile does not
+> yet expose to PHP. See `docs/ARCHITECTURE.md`.
+
 ## v0.1 — Foundation
 
-**Goal:** Establish the PHP package skeleton, bridge contract, and Android-only token registration. Not intended for production use.
+**Goal:** Establish the PHP package skeleton, the adapter over NativePHP's push API, and token registration. Not intended for production use.
 
 **Deliverables:**
 
@@ -16,19 +24,19 @@ Milestone scope may be adjusted based on community feedback and upstream NativeP
 - `FirebasePushServiceProvider` registered via auto-discovery.
 - All contracts defined (`FirebasePushManager`, `TokenRepository`, `BridgeDispatcher`).
 - `FirebasePushManager` concrete implementation — token storage and retrieval only.
-- `NativeSessionTokenRepository` and `CacheTokenRepository`.
+- `NativeSessionTokenRepository` (native secure storage) and `CacheTokenRepository`.
 - `FirebasePush` facade.
 - `PushNotification` data object with `fromBridgePayload` and `toArray`.
-- All six Laravel events defined (no dispatch logic yet beyond stubs).
-- Android: `FirebasePushPlugin` skeleton registered with NativePHP plugin system.
-- Android: `PushNotificationService` extending `FirebaseMessagingService`, `onNewToken` only.
-- Android: Bridge event `firebase-push.token-received` emitted and received in PHP.
+- All six Laravel events defined (only `TokenReceived` dispatched at this milestone).
+- `NativePushBridge` adapter over `Native\Mobile\PushNotifications`.
+- Token registration wired: native `TokenGenerated` event → `handleNativeToken` → `TokenReceived`.
+- Not-yet-available API (`revokeToken`, notification/permission callbacks) throws `FeatureNotSupported`.
 - Configuration file published via `vendor:publish`.
-- `php artisan firebase-push:token` command working on Android emulator.
-- Unit tests for `PushNotification`, repositories, and service provider binding.
+- `php artisan firebase-push:token` command working.
+- Unit + feature tests for `PushNotification`, repositories, manager, and service provider bindings.
 - PHPStan at level 5, zero errors.
 
-**Not included:** iOS, foreground notifications, permission flow, background notifications.
+**Not included:** iOS-specific config, foreground notifications, permission-result events, revocation, background notifications.
 
 ---
 

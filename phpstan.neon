@@ -1,0 +1,8 @@
+parameters:
+    # Roadmap target: level 5 at v0.1, raising to 9 by v0.3.
+    # Bump this single value as the milestones progress.
+    level: 5
+    paths:
+        - src
+        - config
+    treatPhpDocTypesAsCertain: false

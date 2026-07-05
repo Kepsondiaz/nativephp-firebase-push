@@ -1,0 +1,59 @@
+{
+    "name": "kepson/nativephp-firebase-push",
+    "description": "Firebase Cloud Messaging push notifications for NativePHP Mobile apps, with a Laravel-native developer experience.",
+    "keywords": [
+        "nativephp",
+        "firebase",
+        "fcm",
+        "push-notifications",
+        "laravel",
+        "mobile"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0 || ^12.0",
+        "illuminate/contracts": "^11.0 || ^12.0",
+        "nativephp/mobile": "^3.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.18",
+        "orchestra/testbench": "^9.0 || ^10.0",
+        "pestphp/pest": "^3.0",
+        "phpstan/phpstan": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Kepson\\NativePhpFirebasePush\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Kepson\\NativePhpFirebasePush\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "lint": "pint",
+        "test": "pest",
+        "analyse": "phpstan analyse"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Kepson\\NativePhpFirebasePush\\FirebasePushServiceProvider"
+            ],
+            "aliases": {
+                "FirebasePush": "Kepson\\NativePhpFirebasePush\\Facades\\FirebasePush"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

@@ -57,10 +57,12 @@ Contracts/
 
 `src/FirebasePushManager.php` is the single concrete implementation of `FirebasePushManager`. It:
 
-- Holds a reference to the `TokenRepository` and `BridgeDispatcher`.
-- Provides all public facade methods (`token()`, `requestPermission()`, `isPermissionGranted()`, `revokeToken()`).
-- Registers foreground and tap callbacks through the bridge dispatcher.
-- Fires Laravel events after each native event is received and after each facade action.
+- Holds a reference to the `TokenRepository`, the `BridgeDispatcher`, and the Laravel event dispatcher.
+- Provides all public facade methods (`token()`, `requestPermission()`, `isPermissionGranted()`, `revokeToken()`, and the `on*` callback registrars).
+- Stores registered callbacks and invokes them alongside the corresponding Laravel event.
+- Exposes `handleNativeToken()`, the internal seam the service provider's `TokenGenerated` listener calls; it is the only place the package dispatches events.
+
+Methods whose native capability is not yet exposed by NativePHP Mobile throw `Exceptions\FeatureNotSupported` (see the Roadmap for scheduling).
 
 ### Data Objects
 
@@ -91,102 +93,43 @@ The active implementation is resolved by `FirebasePushServiceProvider` based on 
 
 ## NativePHP Bridge
 
-NativePHP Mobile exposes a bidirectional bridge between PHP (running on-device via the NativePHP runtime) and native platform code. The bridge has two directions:
+NativePHP Mobile v3 already owns the platform (Android FCM / iOS APNs) push integration and exposes it to PHP. This package does **not** reimplement the native SDK integration or invent a custom bridge; it **adapts** over what NativePHP Mobile provides. This is a deliberate decision recorded during v0.1 implementation after inspecting the actual `nativephp/mobile` dependency.
 
-**Outbound (PHP → Native)**
-PHP code calls a bridge method by name, optionally passing a JSON-serialisable payload. The NativePHP runtime routes the call to a registered native handler on the correct platform.
+NativePHP Mobile exposes push over two mechanisms:
 
-**Inbound (Native → PHP)**
-The native platform code dispatches a named bridge event carrying a JSON payload. The NativePHP runtime delivers this event to the registered PHP listener.
+**Outbound (PHP → Native), synchronous**
+`Native\Mobile\PushNotifications` provides synchronous calls that return a value directly:
+
+| NativePHP call | Purpose |
+|---|---|
+| `PushNotifications::getToken()` | Return the current FCM (Android) / APNs (iOS) token, or null |
+| `PushNotifications::checkPermission()` | Return the permission status string without prompting |
+| `PushNotifications::enroll()` | Request permission and enroll for push notifications |
+
+**Inbound (Native → PHP), asynchronous**
+The native runtime dispatches a standard Laravel event, `Native\Mobile\Events\PushNotification\TokenGenerated`, carrying `(string $token, ?string $id)` when a token is generated.
 
 ### Package Bridge Contract
 
-The package registers the following bridge event names it listens for:
+`Contracts\BridgeDispatcher` is the seam the package adapts over. Its sole concrete implementation, `Bridge\NativePushBridge`, is the only class in the package that references `Native\Mobile` directly.
 
-| Bridge Event Name | Trigger |
+| `BridgeDispatcher` method | Delegates to |
 |---|---|
-| `firebase-push.token-received` | FCM SDK delivers a registration token |
-| `firebase-push.notification-received` | Notification arrives in foreground |
-| `firebase-push.notification-tapped` | User taps a notification |
-| `firebase-push.permission-granted` | OS permission prompt accepted |
-| `firebase-push.permission-denied` | OS permission prompt rejected |
-| `firebase-push.token-revoked` | Token invalidated |
+| `getToken(): ?string` | `PushNotifications::getToken()` |
+| `permissionStatus(): ?string` | `PushNotifications::checkPermission()` |
+| `requestPermission(): void` | `PushNotifications::enroll()` |
 
-The package registers the following outbound bridge call names:
+Inbound token delivery is **not** modelled on the contract. The service provider registers a listener for the native `TokenGenerated` event and forwards it to `FirebasePushManager::handleNativeToken()`, keeping event dispatch centralised in the manager.
 
-| Bridge Call Name | Purpose |
-|---|---|
-| `firebase-push.request-permission` | Invoke OS permission prompt |
-| `firebase-push.get-token` | Request current token from FCM SDK |
-| `firebase-push.revoke-token` | Instruct FCM SDK to delete the token |
-
-All payload keys are `camelCase` strings. All timestamps are ISO 8601 UTC strings. The bridge payload schema for each event is defined in `src/Bridge/Payloads/` as readonly PHP classes used purely for documentation and deserialization validation.
+Because NativePHP owns the native layer, the package ships **no Kotlin or Swift** for token registration. Custom native code would only be required for behaviours NativePHP does not yet expose (e.g. foreground notification / tap delivery), and is deferred to the milestone that needs it.
 
 ---
 
-## Android Architecture
+## Platform Layer (owned by NativePHP Mobile)
 
-The Android layer integrates the Firebase Android SDK (specifically `firebase-messaging`) within the NativePHP Mobile Android host application.
+The Android (FCM) and iOS (APNs → FCM) SDK integration, permission prompts, token generation, and build-time placement of `google-services.json` / `GoogleService-Info.plist` are all handled by NativePHP Mobile. This package consumes them through `NativePushBridge` and the `TokenGenerated` event.
 
-### Components
-
-**FirebasePushPlugin**
-The top-level NativePHP plugin class registered with the NativePHP Android plugin system. It owns the lifecycle of all FCM interactions and is the only class allowed to call NativePHP's outbound bridge dispatch.
-
-**PushNotificationService**
-Extends `FirebaseMessagingService`. Handles:
-- `onNewToken(token: String)` — emits `firebase-push.token-received` through the bridge.
-- `onMessageReceived(message: RemoteMessage)` — maps the FCM `RemoteMessage` to the bridge payload schema and emits `firebase-push.notification-received` or stores the payload for later retrieval when the app was in the background.
-
-**NotificationChannelManager**
-Creates and configures Android `NotificationChannel` objects using the channel configuration forwarded from the PHP config layer through the bridge at app startup.
-
-**PermissionHandler**
-Manages the `POST_NOTIFICATIONS` runtime permission request/response cycle (required on Android 13+). Emits `firebase-push.permission-granted` or `firebase-push.permission-denied` after the user responds.
-
-**BridgeCallHandler**
-Receives inbound bridge calls from PHP (`firebase-push.request-permission`, `firebase-push.get-token`, `firebase-push.revoke-token`) and routes them to the appropriate Android component.
-
-### Configuration Injection
-
-At build time, NativePHP copies `google-services.json` from the PHP project root into the Android build directory. The Android Firebase SDK locates this file automatically by convention — no manual wiring is required.
-
----
-
-## iOS Architecture
-
-The iOS layer integrates the Firebase iOS SDK (`FirebaseMessaging`) within the NativePHP Mobile iOS host application.
-
-### Components
-
-**FirebasePushPlugin**
-The top-level NativePHP plugin class registered with the NativePHP iOS plugin system. Mirrors the Android design: it owns FCM lifecycle and is the only class allowed to dispatch bridge events.
-
-**AppDelegateExtension**
-Hooks into the NativePHP app delegate lifecycle to:
-- Call `FirebaseApp.configure()` at launch using the bundled `GoogleService-Info.plist`.
-- Register for remote notifications (`UIApplication.registerForRemoteNotifications()`).
-- Forward APNs device tokens to the FCM SDK via `Messaging.messaging().apnsToken`.
-
-**MessagingDelegate**
-Implements `MessagingDelegate`. Handles:
-- `messaging(_:didReceiveRegistrationToken:)` — emits `firebase-push.token-received`.
-- `messaging(_:didReceive:)` — processes foreground notifications and emits `firebase-push.notification-received`.
-
-**UNUserNotificationCenterDelegate**
-Implements `UNUserNotificationCenterDelegate`. Handles:
-- `userNotificationCenter(_:willPresent:withCompletionHandler:)` — allows foreground notification display and emits `firebase-push.notification-received`.
-- `userNotificationCenter(_:didReceive:withCompletionHandler:)` — emits `firebase-push.notification-tapped` when the user taps a notification.
-
-**PermissionHandler**
-Wraps `UNUserNotificationCenter.requestAuthorization(options:)`. Emits `firebase-push.permission-granted` or `firebase-push.permission-denied`.
-
-**BridgeCallHandler**
-Receives inbound bridge calls from PHP and routes them to the appropriate iOS component.
-
-### Configuration Injection
-
-At build time, NativePHP copies `GoogleService-Info.plist` from the PHP project root into the iOS app bundle. The Firebase SDK locates this file automatically by convention.
+Capabilities NativePHP Mobile does **not** currently expose to PHP — and which this package therefore cannot yet deliver — include foreground `NotificationReceived` / `NotificationTapped` events, permission-result events, and token revocation. The corresponding public methods exist on the contract but fail loudly with `Exceptions\FeatureNotSupported` until the underlying capability is available. See `docs/ROADMAP.md` for when each is scheduled.
 
 ---
 
@@ -198,47 +141,31 @@ At build time, NativePHP copies `GoogleService-Info.plist` from the PHP project 
 App Launch
     │
     ▼
-[Android/iOS] FCM SDK initialises
+[NativePHP Mobile] Native FCM/APNs SDK initialises and generates a token
     │
     ▼
-[Android/iOS] SDK delivers token via onNewToken / didReceiveRegistrationToken
+[NativePHP Mobile] Dispatches Native\Mobile ...\TokenGenerated { token, id }
     │
     ▼
-[Android/iOS] BridgeDispatcher emits firebase-push.token-received { token, refreshed }
+[PHP] Service provider's listener forwards to FirebasePushManager::handleNativeToken()
     │
-    ▼
-[NativePHP Bridge] Routes event to PHP runtime
-    │
-    ▼
-[PHP] FirebasePushManager receives event
-    │
+    ├── Skips duplicates matching the stored token
     ├── Persists token via TokenRepository
-    ├── Fires TokenReceived Laravel event
+    ├── Fires TokenReceived Laravel event (when dispatch_events is true)
     └── Invokes registered onTokenReceived callbacks
 ```
 
-### Foreground Notification (Happy Path)
+### Token Retrieval (Synchronous)
 
 ```
-FCM Server sends notification
+PHP: FirebasePush::token()
+    │
+    ├── Returns the persisted token when present, otherwise:
+    ▼
+[PHP] BridgeDispatcher::getToken() → Native\Mobile PushNotifications::getToken()
     │
     ▼
-[Android/iOS] App is in foreground — FCM SDK delivers to service/delegate
-    │
-    ▼
-[Android/iOS] Maps RemoteMessage → bridge payload
-    │
-    ▼
-[Android/iOS] BridgeDispatcher emits firebase-push.notification-received { ... }
-    │
-    ▼
-[NativePHP Bridge] Routes event to PHP runtime
-    │
-    ▼
-[PHP] FirebasePushManager constructs PushNotification from payload
-    │
-    ├── Fires NotificationReceived Laravel event
-    └── Invokes registered onNotificationReceived callbacks
+[PHP] Persists and returns the token (no event fired on passive fetch)
 ```
 
 ### Permission Request Flow
@@ -247,23 +174,18 @@ FCM Server sends notification
 PHP: FirebasePush::requestPermission()
     │
     ▼
-[PHP] FirebasePushManager calls BridgeDispatcher.call('firebase-push.request-permission')
+[PHP] BridgeDispatcher::requestPermission() → PushNotifications::enroll()
     │
     ▼
-[NativePHP Bridge] Routes call to platform
+[NativePHP Mobile] Shows the OS permission prompt and enrolls for push
     │
     ▼
-[Android/iOS] PermissionHandler shows OS prompt
-    │
-    ▼
-User responds
-    │
-    ├── Granted → emit firebase-push.permission-granted
-    └── Denied  → emit firebase-push.permission-denied
-         │
-         ▼
-    [PHP] FirebasePushManager fires PermissionGranted or PermissionDenied event
+On success, a token is delivered asynchronously via the TokenGenerated flow above
 ```
+
+### Foreground Notification & Permission-Result Flows
+
+Not yet available: NativePHP Mobile does not currently expose foreground `NotificationReceived` / `NotificationTapped` or permission-result events to PHP. The corresponding contract methods throw `FeatureNotSupported` until the platform provides these signals. See `docs/ROADMAP.md`.
 
 ---
 
@@ -283,15 +205,10 @@ nativephp-firebase-push/
 │
 ├── src/
 │   ├── Bridge/
-│   │   ├── BridgeDispatcher.php       — concrete NativePHP bridge dispatcher
-│   │   └── Payloads/                  — bridge payload schema classes (readonly)
-│   │       ├── TokenReceivedPayload.php
-│   │       ├── NotificationPayload.php
-│   │       └── PermissionPayload.php
+│   │   └── NativePushBridge.php       — adapter over Native\Mobile\PushNotifications
 │   │
 │   ├── Commands/
-│   │   ├── TokenCommand.php
-│   │   └── TestNotificationCommand.php
+│   │   └── TokenCommand.php
 │   │
 │   ├── Contracts/
 │   │   ├── FirebasePushManager.php
@@ -300,6 +217,9 @@ nativephp-firebase-push/
 │   │
 │   ├── Data/
 │   │   └── PushNotification.php       — immutable notification value object
+│   │
+│   ├── Exceptions/
+│   │   └── FeatureNotSupported.php    — thrown for not-yet-available API
 │   │
 │   ├── Events/
 │   │   ├── TokenReceived.php
@@ -346,6 +266,8 @@ nativephp-firebase-push/
 
 **Events are not the callbacks.** The facade `onNotificationReceived` callbacks and the Laravel events serve different audiences. Callbacks are for inline application logic in service providers. Events are for decoupled listeners. Both are always fired; neither is optional when `dispatch_events` is true.
 
-**Platform code is read-only from PHP's perspective.** PHP never pushes configuration into the platform layer at runtime except through explicit bridge calls. Platform components are self-contained — they do not poll PHP.
+**The native layer is owned by NativePHP Mobile.** This package adapts over `Native\Mobile\PushNotifications` and the `TokenGenerated` event rather than shipping its own Kotlin/Swift or a custom bridge. It reaches the native layer only through `Bridge\NativePushBridge`.
 
-**Payload schema is versioned.** The bridge payload shape is defined in `src/Bridge/Payloads/` with a `version` field. Future breaking changes to the payload shape will increment the version and maintain a backward-compatible deserializer for one major version.
+**Unavailable capabilities fail loudly.** Contract methods whose underlying native capability NativePHP does not yet expose throw `Exceptions\FeatureNotSupported` rather than silently no-op. This keeps the public API honest about what a given milestone actually delivers.
+
+**Raw payload parsing is isolated.** Inbound payloads are mapped to the immutable `Data\PushNotification` via its `fromBridgePayload()` named constructor, so raw array keys never leak into the rest of the codebase.

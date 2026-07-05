@@ -45,15 +45,15 @@ Both platforms must reach feature parity before any stable release is tagged.
 
 ### Service Provider
 
-The package registers a single Laravel service provider: `NativePhp\FirebasePush\FirebasePushServiceProvider`.
+The package registers a single Laravel service provider: `Kepson\NativePhpFirebasePush\FirebasePushServiceProvider`.
 
 Auto-discovery via `composer.json` `extra.laravel.providers` handles registration automatically.
 
 ### Facade / Contract
 
 ```
-NativePhp\FirebasePush\Facades\FirebasePush
-NativePhp\FirebasePush\Contracts\FirebasePushManager
+Kepson\NativePhpFirebasePush\Facades\FirebasePush
+Kepson\NativePhpFirebasePush\Contracts\FirebasePushManager
 ```
 
 #### Methods
@@ -74,6 +74,21 @@ FirebasePush::isPermissionGranted(): bool
 Returns whether the user has granted notification permission. Does not trigger a prompt.
 
 ```
+FirebasePush::revokeToken(): void
+```
+Invalidates the current FCM token and instructs the platform SDK to delete it. Fires the `TokenRevoked` event and invokes registered `onTokenRevoked` callbacks once the platform confirms deletion. Typically called on user sign-out.
+
+```
+FirebasePush::onTokenReceived(callable $callback): void
+```
+Registers a handler invoked when an FCM registration token is acquired or refreshed. The callable receives `(string $token, bool $refreshed)`.
+
+```
+FirebasePush::onTokenRevoked(callable $callback): void
+```
+Registers a handler invoked when the FCM token is revoked. The callable receives no arguments.
+
+```
 FirebasePush::onNotificationReceived(callable $callback): void
 ```
 Registers a foreground notification handler. The callable receives a `PushNotification` value object.
@@ -82,6 +97,20 @@ Registers a foreground notification handler. The callable receives a `PushNotifi
 FirebasePush::onNotificationTapped(callable $callback): void
 ```
 Registers a handler invoked when the user taps a notification that launched or foregrounded the app. The callable receives a `PushNotification` value object.
+
+```
+FirebasePush::onPermissionGranted(callable $callback): void
+```
+Registers a handler invoked when the user grants notification permission in response to `requestPermission()`. The callable receives no arguments.
+
+```
+FirebasePush::onPermissionDenied(callable $callback): void
+```
+Registers a handler invoked when the user denies notification permission. The callable receives no arguments.
+
+#### Capability Availability
+
+The package adapts over the native push surface exposed by NativePHP Mobile (`Native\Mobile\PushNotifications` and the `TokenGenerated` event). Where a method's underlying native capability is not yet exposed by NativePHP Mobile, calling it throws `Kepson\NativePhpFirebasePush\Exceptions\FeatureNotSupported` rather than silently doing nothing. As of the current milestone this applies to `revokeToken()`, `onTokenRevoked()`, `onNotificationReceived()`, `onNotificationTapped()`, `onPermissionGranted()`, and `onPermissionDenied()`. `docs/ROADMAP.md` tracks when each becomes available.
 
 ### Configuration
 
@@ -108,7 +137,7 @@ Sends a test notification payload through the NativePHP bridge to the local devi
 All notification data is represented as an immutable value object:
 
 ```
-NativePhp\FirebasePush\Data\PushNotification
+Kepson\NativePhpFirebasePush\Data\PushNotification
 ```
 
 ### Properties
@@ -120,8 +149,8 @@ NativePhp\FirebasePush\Data\PushNotification
 | `body` | `?string` | Notification body text |
 | `imageUrl` | `?string` | Optional image URL attached to the notification |
 | `data` | `array<string, string>` | Arbitrary key/value data payload from FCM |
-| `sentAt` | `?Carbon` | UTC timestamp set by the FCM server at send time |
-| `receivedAt` | `Carbon` | UTC timestamp recorded by the device on receipt |
+| `sentAt` | `?CarbonImmutable` | UTC timestamp set by the FCM server at send time |
+| `receivedAt` | `CarbonImmutable` | UTC timestamp recorded by the device on receipt |
 | `channel` | `?string` | Android notification channel ID (Android only) |
 | `collapseKey` | `?string` | FCM collapse key, if set |
 | `tapped` | `bool` | `true` when the notification was tapped to open the app |
@@ -145,7 +174,7 @@ Returns the notification as a plain array, suitable for serialization or logging
 
 All events are standard Laravel events dispatchable via `event()` or `Event::dispatch()` and listenable in `EventServiceProvider` or discovered automatically.
 
-### `NativePhp\FirebasePush\Events\TokenReceived`
+### `Kepson\NativePhpFirebasePush\Events\TokenReceived`
 
 Fired when a new FCM registration token is acquired or refreshed.
 
@@ -154,7 +183,7 @@ Fired when a new FCM registration token is acquired or refreshed.
 | `token` | `string` | The new FCM registration token |
 | `refreshed` | `bool` | `true` if this replaces a previously held token |
 
-### `NativePhp\FirebasePush\Events\NotificationReceived`
+### `Kepson\NativePhpFirebasePush\Events\NotificationReceived`
 
 Fired when a push notification arrives while the app is in the foreground.
 
@@ -162,7 +191,7 @@ Fired when a push notification arrives while the app is in the foreground.
 |---|---|---|
 | `notification` | `PushNotification` | The received notification |
 
-### `NativePhp\FirebasePush\Events\NotificationTapped`
+### `Kepson\NativePhpFirebasePush\Events\NotificationTapped`
 
 Fired when the user taps a notification to open the app (cold start or resume).
 
@@ -170,15 +199,15 @@ Fired when the user taps a notification to open the app (cold start or resume).
 |---|---|---|
 | `notification` | `PushNotification` | The tapped notification |
 
-### `NativePhp\FirebasePush\Events\PermissionGranted`
+### `Kepson\NativePhpFirebasePush\Events\PermissionGranted`
 
 Fired when the user grants notification permission in response to `requestPermission()`.
 
-### `NativePhp\FirebasePush\Events\PermissionDenied`
+### `Kepson\NativePhpFirebasePush\Events\PermissionDenied`
 
 Fired when the user denies notification permission. Carries no additional properties.
 
-### `NativePhp\FirebasePush\Events\TokenRevoked`
+### `Kepson\NativePhpFirebasePush\Events\TokenRevoked`
 
 Fired when the FCM token is explicitly invalidated (e.g., the user signs out and the application calls `FirebasePush::revokeToken()`).
 
@@ -223,7 +252,8 @@ File: `config/firebase-push.php`
 
     /*
      * Token persistence driver.
-     * 'session' stores the token in NativePHP's native key-value store.
+     * 'session' stores the token in NativePHP's native secure storage
+     *           (Android Keystore / iOS Keychain). The default.
      * 'cache'   stores the token in the configured Laravel cache.
      */
     'token_driver' => env('FIREBASE_PUSH_TOKEN_DRIVER', 'session'),
