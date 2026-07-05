@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Permission-result callbacks: `onPermissionGranted()` / `onPermissionDenied()` and the `PermissionGranted` / `PermissionDenied` events.
 - `firebase-push:test {token}` command to locally simulate an inbound notification (no server-side FCM call).
 - Internal bridge events (`NativeNotificationReceived`, `NativeNotificationTapped`, `NativePermissionResult`) forwarded by the service provider to the manager.
+- Converted to a NativePHP plugin (`composer.json` type `nativephp-plugin`, `nativephp.json` manifest).
+- Android native plugin drafts (`resources/android/`): `FirebasePushMessagingService.kt` (foreground receive + channel + notification) and `FirebasePushTapActivity.kt` (tap + deep link). **Unverified — pending device testing.**
 - `CHANGELOG.md`.
 
 ### Changed

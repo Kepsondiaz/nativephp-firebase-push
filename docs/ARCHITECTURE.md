@@ -166,6 +166,16 @@ nativephp.json       — plugin manifest
 - `php artisan native:plugin:validate` — validate the manifest.
 - `php artisan native:run` — rebuild native code onto a device/emulator.
 
+**Confirmed mechanism (from the `nativephp/mobile-camera` reference).** Native code dispatches an event to PHP by calling `NativeActionCoordinator.dispatchEvent("Fully\\Qualified\\PhpEvent", jsonPayloadString)` (from `com.nativephp.mobile.utils`). The runtime maps top-level JSON keys onto the PHP event class's constructor parameters — and array/object parameters are supported (the base `Gallery\MediaSelected` has `public array $files`), so our bridge events take a single `array $payload` populated from a `{ "payload": { … } }` envelope.
+
+**Components in this package** (`resources/android/`):
+
+- `FirebasePushMessagingService.kt` — a `FirebaseMessagingService`; `onMessageReceived` maps the FCM `RemoteMessage` to our payload, displays a notification (creating the channel), and dispatches `NativeNotificationReceived`.
+- `FirebasePushTapActivity.kt` — a trampoline launched by the notification's tap intent; dispatches `NativeNotificationTapped` (with any deep-link target) and resumes the host app.
+- `nativephp.json` — declares the service (bound to `com.google.firebase.MESSAGING_EVENT`), the `POST_NOTIFICATIONS` permission, the `firebase-messaging` Gradle dependency, and the three bridge event classes.
+
+> **Status: unverified drafts.** The Kotlin above is written to the reference pattern but has **not** been built or run. Known open questions: (1) whether registering our service shadows the base's token-generating service (FCM delivers to one service); (2) the exact `dispatchEvent` accessor; (3) registering the tap activity in the manifest; (4) capturing taps on system-displayed background notifications; (5) injecting the PHP channel config into native. These require a host NativePHP app + Android toolchain + emulator to resolve.
+
 **Testing boundary.** The PHP layer (payload mapping, manager wiring, event dispatch) is fully testable in this repo with the `FakeBridgeDispatcher`. The Kotlin layer requires a host NativePHP app, the Android toolchain, and an emulator/device, and is therefore verified manually per release — not in CI (see `docs/CONTRIBUTING.md`).
 
 ---

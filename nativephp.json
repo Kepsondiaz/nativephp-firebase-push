@@ -1,0 +1,32 @@
+{
+    "namespace": "FirebasePush",
+    "events": [
+        "Kepson\\NativePhpFirebasePush\\Bridge\\Events\\NativeNotificationReceived",
+        "Kepson\\NativePhpFirebasePush\\Bridge\\Events\\NativeNotificationTapped",
+        "Kepson\\NativePhpFirebasePush\\Bridge\\Events\\NativePermissionResult"
+    ],
+    "android": {
+        "min_version": 26,
+        "permissions": [
+            "android.permission.POST_NOTIFICATIONS"
+        ],
+        "dependencies": {
+            "implementation": [
+                "com.google.firebase:firebase-messaging:24.0.0"
+            ]
+        },
+        "services": [
+            {
+                "name": ".FirebasePushMessagingService",
+                "exported": false,
+                "intentFilters": [
+                    {
+                        "actions": [
+                            "com.google.firebase.MESSAGING_EVENT"
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}
